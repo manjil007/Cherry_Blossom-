@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<!--
+  =============================================================================
+  index.html
+  Owner: Member 2 (Growth, wind and controls)
+  -----------------------------------------------------------------------------
+  What this file does:
+    The page that opens when someone visits the project. It holds the
+    full-window WebGL canvas, the control panel (title, status line, the three
+    sliders with their readouts, and short help), a notice line for messages,
+    and the script tags that load every JavaScript file in the right order.
+
+  The element ids are part of the team contract:
+    glcanvas                              the canvas; main.js passes it to renderer.js and input.js
+    angleSlider, depthSlider, windSlider  the sliders, read by ui.js
+    angleValue, depthValue, windValue     the slider readouts, written by ui.js
+    status                                selected tree and tree count, written by ui.js
+    notice                                short messages, written by ui.js
+  Don't rename an id or change the script order without telling the team.
+  =============================================================================
+-->
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cherry Blossom</title>
+  <link rel="icon" href="data:,">
+  <style>
+    /* TODO (Member 2): style the page and the panel. Keep the canvas filling the whole window. */
+    html, body { height: 100%; margin: 0; overflow: hidden; background: #05060d; color: #dde3ee; font-family: system-ui, sans-serif; }
+    #glcanvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+    .panel { position: fixed; top: 12px; left: 12px; width: 270px; padding: 12px 14px; background: rgba(10, 12, 22, 0.85); border-radius: 8px; }
+    .panel h1 { margin: 0 0 8px; font-size: 18px; }
+    .row { display: grid; grid-template-columns: 100px 1fr 40px; gap: 8px; align-items: center; margin-top: 6px; }
+    #notice { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); margin: 0; }
+  </style>
+</head>
+
+<body>
+  <canvas id="glcanvas"></canvas>
+
+  <div class="panel">
+    <h1>Cherry Blossom</h1>
+    <p id="status"></p>
+
+    <div class="row">
+      <label for="angleSlider">Branch angle</label>
+      <input type="range" id="angleSlider" min="10" max="50" value="30">
+      <span id="angleValue"></span>
+    </div>
+    <div class="row">
+      <label for="depthSlider">Depth</label>
+      <input type="range" id="depthSlider" min="1" max="5" value="4">
+      <span id="depthValue"></span>
+    </div>
+    <div class="row">
+      <label for="windSlider">Wind strength</label>
+      <input type="range" id="windSlider" min="0" max="100" value="35">
+      <span id="windValue"></span>
+    </div>
+
+    <ul>
+      <li>Click the ground to plant a tree (up to 3).</li>
+      <li>Click a tree to select it. The angle and depth sliders change the selected tree.</li>
+      <li>Drag to orbit the camera.</li>
+    </ul>
+  </div>
+
+  <p id="notice"></p>
+
+  <!-- Scripts load in this order (README section 5.1). Only main.js starts anything, so it must stay last. -->
+  <script src="transforms.js"></script>  <!-- Member 1: matrix and vector math -->
+  <script src="models.js"></script>      <!-- Member 1: cylinder and sphere meshes -->
+  <script src="tree.js"></script>        <!-- Member 1: branch hierarchy and world matrices -->
+  <script src="animation.js"></script>   <!-- Member 2: growth, blossoms, wind -->
+  <script src="camera.js"></script>      <!-- Member 3: orbit camera -->
+  <script src="picking.js"></script>     <!-- Member 3: click rays and bounding boxes -->
+  <script src="shaders.js"></script>     <!-- Member 4: GLSL shader source -->
+  <script src="renderer.js"></script>    <!-- Member 4: WebGL setup and drawing -->
+  <script src="ui.js"></script>          <!-- Member 2: sliders, status line, notices -->
+  <script src="input.js"></script>       <!-- Member 3: mouse, planting, selecting -->
+  <script src="main.js"></script>        <!-- Member 2: shared state, startup, animation loop -->
+</body>
+
+</html>
