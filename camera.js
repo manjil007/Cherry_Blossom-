@@ -37,8 +37,14 @@ const camera = {
  * @param {number} aspect  width / height of the canvas
  */
 function perspective(fovy, aspect, near, far) {
-  // TODO (Member 3)
-  return identity();
+  const f = 1 / Math.tan(fovy / 2);
+  const m = new Float32Array(16);
+  m[0] = f / aspect;
+  m[5] = f;
+  m[10] = (far + near) / (near - far);
+  m[11] = -1;
+  m[14] = (2 * far * near) / (near - far);
+  return m;
 }
 
 
@@ -47,15 +53,28 @@ function perspective(fovy, aspect, near, far) {
  * (usually [0, 1, 0]) as the up direction.
  */
 function lookAt(eye, target, up) {
-  // TODO (Member 3)
-  return identity();
+  const z = normalize(subtract(eye, target));
+  const x = normalize(cross(up, z));
+  const y = cross(z, x);
+
+  return new Float32Array([
+    x[0], y[0], z[0], 0,
+    x[1], y[1], z[1], 0,
+    x[2], y[2], z[2], 0,
+    -dot(x, eye), -dot(y, eye), -dot(z, eye), 1
+  ]);
 }
 
 
 /** Returns the camera's world position, computed from camera.target, azimuth, elevation and distance. */
 function getCameraPosition() {
-  // TODO (Member 3)
-  return [0, 0, camera.distance];
+  const { target, azimuth, elevation, distance } = camera;
+  const horizontalDistance = distance * Math.cos(elevation);
+  return [
+    target[0] + horizontalDistance * Math.sin(azimuth),
+    target[1] + distance * Math.sin(elevation),
+    target[2] + horizontalDistance * Math.cos(azimuth)
+  ];
 }
 
 
@@ -66,8 +85,9 @@ function getCameraPosition() {
  * picking.js on every click, so drawing and picking always use the same camera.
  */
 function getViewProjection(aspect) {
-  // TODO (Member 3)
-  return identity();
+  const projection = perspective(camera.fov, aspect, camera.near, camera.far);
+  const view = lookAt(getCameraPosition(), camera.target, [0, 1, 0]);
+  return multiply(projection, view);
 }
 
 
@@ -78,7 +98,8 @@ function getViewProjection(aspect) {
  * Called by input.js.
  */
 function orbitCamera(dx, dy) {
-  // TODO (Member 3)
+  camera.azimuth -= dx * 0.005;
+  camera.elevation = clamp(camera.elevation + dy * 0.005, 0.05, 1.5);
 }
 
 
@@ -87,5 +108,5 @@ function orbitCamera(dx, dy) {
  * Called by input.js.
  */
 function zoomCamera(amount) {
-  // TODO (Member 3, optional)
+  camera.distance = clamp(camera.distance * (1 + amount * 0.001), 4, 40);
 }
