@@ -15,8 +15,8 @@
 //   initRenderer  (main.js, once at startup)
 //   drawScene     (main.js, every frame)
 // Uses:
-//   transforms.js: multiply, translate, scale, normalize
-//   models.js:     createTaperedCylinder, createSphere, createEmptyMesh
+//   transforms.js: multiply, translate, scale, normalize, scaleVector
+//   models.js:     createTaperedCylinder, createSphere
 //   shaders.js:    VERTEX_SHADER, FRAGMENT_SHADER
 //   camera.js:     getViewProjection (and getCameraPosition if a shader needs it)
 //   tree.js:       TREE_SETTINGS, getBranchTip, and the branch fields world,
@@ -36,6 +36,8 @@ const BLOSSOM_COLORS = [                     // one per tree, indexed by tree.id
   [1.0, 0.7, 0.6]                            // peach
 ];
 const GROUND_RADIUS = 20;                    // radius of the ground disk
+const RENDERER_NO_EMISSION = [0, 0, 0];
+const RENDERER_RING_COLOR = [0.65, 0.42, 0.32];
 
 // This file's own state, filled in by initRenderer
 const renderer = {
@@ -43,7 +45,8 @@ const renderer = {
   gl: null,          // the WebGL 2 context
   program: null,     // the linked shader program
   uniforms: {},      // uniform locations, e.g. renderer.uniforms.uModel
-  meshes: {}         // { cylinder, sphere, ground }, each { vao, count }
+  meshes: {},        // cylinder, sphere, ground and selection ring, each { vao, count }
+  groundModel: null
 };
 
 
@@ -59,14 +62,50 @@ const renderer = {
  *      and the light uniforms that never change
  */
 function initRenderer(canvas) {
-  // TODO (Member 4)
+  renderer.canvas = canvas;
+  const gl = canvas.getContext("webgl2");
+  renderer.gl = gl;
+  if (!gl) {
+    document.getElementById("notice").textContent = "This garden needs a browser with WebGL 2 enabled.";
+    return;
+  }
+
+  const program = createProgram(VERTEX_SHADER, FRAGMENT_SHADER);
+  renderer.program = program;
+  gl.useProgram(program);
+  for (const name of ["uModel", "uViewProjection", "uNormalMatrix", "uColor",
+                      "uEmissive", "uAmbient", "uLightDirection", "uLightColor"]) {
+    renderer.uniforms[name] = gl.getUniformLocation(program, name);
+  }
+
+  renderer.meshes.cylinder = createMesh(createTaperedCylinder(TREE_SETTINGS.radiusRatio, 16));
+  renderer.meshes.sphere = createMesh(createSphere(12, 16));
+  renderer.meshes.ground = createMesh(createGroundMesh());
+  renderer.meshes.ring = createMesh(createRendererDisk(0.88));
+  renderer.groundModel = scale(GROUND_RADIUS, 1, GROUND_RADIUS);
+
+  gl.enable(gl.DEPTH_TEST);
+  gl.enable(gl.CULL_FACE);
+  gl.clearColor(...BACKGROUND, 1);
+  gl.uniform3fv(renderer.uniforms.uAmbient, AMBIENT);
+  gl.uniform3fv(renderer.uniforms.uLightDirection, normalize(LIGHT_DIRECTION));
+  gl.uniform3fv(renderer.uniforms.uLightColor, LIGHT_COLOR);
 }
 
 
 /** Compiles one shader. Throws an error with the shader's info log if it fails. */
 function compileShader(type, source) {
-  // TODO (Member 4)
-  return null;
+  const gl = renderer.gl;
+  const shader = gl.createShader(type);
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    const log = gl.getShaderInfoLog(shader);
+    gl.deleteShader(shader);
+    const stage = type === gl.VERTEX_SHADER ? "Vertex" : "Fragment";
+    throw new Error(stage + " shader compilation failed: " + log);
+  }
+  return shader;
 }
 
 
@@ -75,8 +114,23 @@ function compileShader(type, source) {
  * bound to attribute location 0 and aNormal to location 1.
  */
 function createProgram(vertexSource, fragmentSource) {
-  // TODO (Member 4)
-  return null;
+  const gl = renderer.gl;
+  const program = gl.createProgram();
+  try {
+    for (const [type, source] of [[gl.VERTEX_SHADER, vertexSource], [gl.FRAGMENT_SHADER, fragmentSource]]) {
+      const shader = compileShader(type, source);
+      gl.attachShader(program, shader);
+      gl.deleteShader(shader); // The program retains the attached shader.
+    }
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      throw new Error("Shader program link failed: " + gl.getProgramInfoLog(program));
+    }
+    return program;
+  } catch (error) {
+    gl.deleteProgram(program);
+    throw error;
+  }
 }
 
 
@@ -86,8 +140,20 @@ function createProgram(vertexSource, fragmentSource) {
  * indices.
  */
 function createMesh(meshData) {
-  // TODO (Member 4)
-  return { vao: null, count: 0 };
+  const gl = renderer.gl;
+  const vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  for (const [location, data] of [[0, meshData.positions], [1, meshData.normals]]) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+    gl.vertexAttribPointer(location, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(location);
+  }
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, meshData.indices, gl.STATIC_DRAW);
+  gl.bindVertexArray(null);
+  gl.bindBuffer(gl.ARRAY_BUFFER, null);
+  return { vao, count: meshData.indices.length };
 }
 
 
@@ -96,8 +162,38 @@ function createMesh(meshData) {
  * scaled by GROUND_RADIUS when drawn. Same format as the meshes in models.js.
  */
 function createGroundMesh() {
-  // TODO (Member 4)
-  return createEmptyMesh();
+  return createRendererDisk(0);
+}
+
+/** A unit disk, or an annulus when the selection marker needs a hole. */
+function createRendererDisk(innerRadius) {
+  const segments = 64;
+  const positions = [];
+  const normals = [];
+  const indices = [];
+  const radii = innerRadius > 0 ? [1, innerRadius] : [1];
+  for (const radius of radii) {
+    for (let i = 0; i < segments; i++) {
+      const angle = 2 * Math.PI * i / segments;
+      positions.push(radius * Math.cos(angle), 0, radius * Math.sin(angle));
+      normals.push(0, 1, 0);
+    }
+  }
+  if (innerRadius === 0) {
+    positions.push(0, 0, 0);
+    normals.push(0, 1, 0);
+  }
+  for (let i = 0; i < segments; i++) {
+    const next = (i + 1) % segments;
+    const inner = innerRadius > 0 ? segments + i : segments;
+    indices.push(inner, next, i);
+    if (innerRadius > 0) indices.push(inner, segments + next, next);
+  }
+  return {
+    positions: new Float32Array(positions),
+    normals: new Float32Array(normals),
+    indices: new Uint16Array(indices)
+  };
 }
 
 
@@ -107,14 +203,32 @@ function createGroundMesh() {
  * scaled differently along their length than across it.
  */
 function normalMatrix(model) {
-  // TODO (Member 4)
-  return new Float32Array(9);
+  // The cofactor matrix is the inverse transpose times the determinant.
+  const [a, d, g, , b, e, h, , c, f, i] = model; // rows: [a b c], [d e f], [g h i]
+  const first = e * i - f * h;
+  const second = c * h - b * i;
+  const third = b * f - c * e;
+  const determinant = a * first + d * second + g * third;
+  if (determinant === 0) return new Float32Array(9);
+  const inverseDet = 1 / determinant;
+  return new Float32Array([
+    first * inverseDet, second * inverseDet, third * inverseDet,
+    (f * g - d * i) * inverseDet, (a * i - c * g) * inverseDet, (c * d - a * f) * inverseDet,
+    (d * h - e * g) * inverseDet, (b * g - a * h) * inverseDet, (a * e - b * d) * inverseDet
+  ]);
 }
 
 
 /** Draws one mesh with a model matrix, a base color and an emissive (glow) color. */
-function drawMesh(mesh, model, color, emissive) {
-  // TODO (Member 4)
+function drawMesh(mesh, model, color, emissive = RENDERER_NO_EMISSION) {
+  if (mesh.count === 0) return;
+  const { gl, uniforms } = renderer;
+  gl.uniformMatrix4fv(uniforms.uModel, false, model);
+  gl.uniformMatrix3fv(uniforms.uNormalMatrix, false, normalMatrix(model));
+  gl.uniform3fv(uniforms.uColor, color);
+  gl.uniform3fv(uniforms.uEmissive, emissive);
+  gl.bindVertexArray(mesh.vao);
+  gl.drawElements(gl.TRIANGLES, mesh.count, gl.UNSIGNED_SHORT, 0);
 }
 
 
@@ -127,13 +241,34 @@ function drawMesh(mesh, model, color, emissive) {
  *     an emissive brightness of bloom times that color
  */
 function drawTree(tree) {
-  // TODO (Member 4)
+  const { cylinder, sphere } = renderer.meshes;
+  const blossomColor = BLOSSOM_COLORS[tree.id - 1];
+  for (const branch of tree.branches) {
+    if (branch.growth <= 0) continue;
+    const branchScale = scale(branch.radius, branch.length * branch.growth, branch.radius);
+    drawMesh(cylinder, multiply(branch.world, branchScale), BARK_COLOR);
+
+    const tip = translate(...getBranchTip(branch));
+    const jointRadius = branch.radius * TREE_SETTINGS.radiusRatio;
+    drawMesh(sphere, multiply(tip, scale(jointRadius, jointRadius, jointRadius)), BARK_COLOR);
+    if (branch.children.length === 0 && branch.bloom > 0) {
+      const radius = Math.max(0.075, 2 * branch.radius) * branch.bloom;
+      const model = multiply(tip, scale(radius, radius, radius));
+      drawMesh(sphere, model, blossomColor, scaleVector(blossomColor, branch.bloom));
+    }
+  }
 }
 
 
 /** Matches the canvas's drawing buffer to its size on screen, and updates the viewport. */
 function resizeCanvas() {
-  // TODO (Member 4)
+  const { canvas, gl } = renderer;
+  const ratio = window.devicePixelRatio || 1;
+  const width = Math.max(1, Math.round(canvas.clientWidth * ratio));
+  const height = Math.max(1, Math.round(canvas.clientHeight * ratio));
+  if (canvas.width !== width) canvas.width = width;
+  if (canvas.height !== height) canvas.height = height;
+  gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
 }
 
 
@@ -146,5 +281,18 @@ function resizeCanvas() {
  *   4. mark garden.selected, for example with a ring on the ground
  */
 function drawScene(garden, camera) {
-  // TODO (Member 4)
+  const { gl, uniforms, meshes } = renderer;
+  if (!gl) return;
+  resizeCanvas();
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  const viewProjection = getViewProjection(gl.drawingBufferWidth / gl.drawingBufferHeight);
+  gl.uniformMatrix4fv(uniforms.uViewProjection, false, viewProjection);
+  drawMesh(meshes.ground, renderer.groundModel, GROUND_COLOR);
+  for (const tree of garden.trees) drawTree(tree);
+  if (garden.selected) {
+    const [x, y, z] = garden.selected.position;
+    const marker = multiply(translate(x, y + 0.012, z), scale(0.45, 1, 0.45));
+    drawMesh(meshes.ring, marker, RENDERER_RING_COLOR);
+  }
+  gl.bindVertexArray(null);
 }

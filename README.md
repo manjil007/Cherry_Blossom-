@@ -37,8 +37,8 @@ The project is inspired by Celestial Blossom, a VR experience co-authored by Pro
 ### 1.5 Scope and deployment
 
 - One garden scene, up to three trees, and at most five branching levels per tree.
-- The project is published on GitHub Pages, and its link opens straight to the running scene. Before submitting, the team checks that planting, selecting, orbiting and all three sliders work on the live site.
-- Live site: added here after deployment (section 9).
+- The team will publish the project on GitHub Pages. The link should open directly to the running scene.
+- Live link pending. After the integrated garden passes the planting, selection, orbit and slider checks in section 9, Member 4 will add the verified URL here.
 
 ## 2. Team members and their files
 
@@ -49,7 +49,7 @@ The work is split into four parts of similar size. Each part centers on one grap
 | Member 1 | (add name) | Geometry and hierarchy | transforms.js, models.js, tree.js |
 | Member 2 | (add name) | Growth, wind and controls | animation.js, ui.js, main.js, index.html |
 | Member 3 | (add name) | Camera and interaction | camera.js, picking.js, input.js |
-| Member 4 | (add name) | Rendering and deployment | shaders.js, renderer.js, README.md |
+| Member 4 | [@elliejeanjohn](https://github.com/elliejeanjohn) | Rendering and deployment | shaders.js, renderer.js, README.md |
 
 What each file does (the scripts are listed in the order the page loads them):
 
@@ -118,7 +118,7 @@ Done when: the branches are clearly lit from every camera angle, the blossoms gl
 
 ## 4. Responsibilities: code level
 
-Every function listed here already exists in the skeleton, with a comment that explains it and a `TODO` where the code goes. Keep the names and parameters, because other members call them. Each file's header comment also lists what the file provides and what it uses.
+The functions below define the interfaces between members' files. Keep the names and parameters, because other members call them. Each file's header comment also lists what the file provides and what it uses.
 
 ### Member 1: Geometry and hierarchy
 
@@ -207,8 +207,8 @@ Every function listed here already exists in the skeleton, with a comment that e
 **renderer.js**
 
 - `initRenderer(canvas)` gets the WebGL 2 context, builds the shader program (`compileShader`, `createProgram`), uploads the meshes (`createMesh` with `createTaperedCylinder(TREE_SETTINGS.radiusRatio, 16)`, `createSphere(12, 16)` and `createGroundMesh()`), enables the depth test and sets the light uniforms. main.js calls it at startup.
-- `drawScene(garden, camera)` resizes the canvas, clears it, gets the view-projection from `getViewProjection`, then draws the ground, every tree, and a marker for the selected tree. main.js calls it every frame.
-- `drawTree(tree)` draws each grown branch's cylinder with `model = branch.world * scale(radius, length * growth, radius)`, plus a joint sphere at its tip. Each branch without children whose `bloom` is above 0 gets a glowing blossom at its tip, in `BLOSSOM_COLORS[tree.id - 1]`.
+- `drawScene(garden, camera)` matches the drawing buffer to the canvas size and display density, clears color and depth, and gets the view-projection from `getViewProjection`. It draws the ground, every tree, and a narrow ring just above the selected tree's base. main.js calls it every frame.
+- `drawTree(tree)` draws each growing branch's cylinder with `model = branch.world * scale(radius, length * growth, radius)` and places a joint sphere at `getBranchTip(branch)`. Leaves with positive `bloom` get a blossom there. Its radius and emitted light increase with `bloom`, using the tree's color from `BLOSSOM_COLORS[tree.id - 1]`.
 - `normalMatrix(model)` returns the inverse transpose of the upper-left 3x3. It is needed because the cylinders are scaled non-uniformly.
 
 **README.md and deployment**
@@ -352,7 +352,7 @@ A press that ends without becoming a drag calls `handleClick(x, y)`:
 
 ## 8. Running the project and working with Git
 
-**Run it.** Open index.html in a browser that supports WebGL 2, such as a current version of Chrome, Edge, Firefox or Safari. No server or build step is needed. The skeleton already loads: you should see a dark page with the control panel and no errors in the console. Nothing is drawn until the TODOs are filled in.
+**Run it.** Open `index.html` in a browser with WebGL 2 enabled. No server or build step is needed. The page should load with the control panel and a clean browser console. A visible opening tree requires the geometry, transforms, camera and planting code to be integrated. The animation and UI code drive its growth and the sliders.
 
 **Work on your part.** Use your own branch and your own GitHub account, so the repository's Insights → Contributors page shows everyone's work.
 
@@ -379,7 +379,8 @@ git merge main
 
 1. On GitHub, open the repository's **Settings → Pages**.
 2. Under **Build and deployment**, choose **Deploy from a branch**, select the **main** branch and the **/ (root)** folder, and save.
-3. After a minute or two, the site is live at `https://<username>.github.io/<repository>/`.
-4. Open that link and check that the scene starts, that planting and selecting work, that the camera orbits, and that all three sliders work. Then add the link to section 1.5.
+3. Wait for the Pages deployment to succeed. Open the URL shown in **Settings → Pages** in a fresh browser tab.
+4. Watch the opening tree grow and its blossoms brighten. Plant two more trees, click to switch the selection ring, and confirm a fourth planting shows the limit notice. Orbit across overlapping branches to check lighting and depth. Dragging should leave the tree count unchanged.
+5. Check each slider. Branch angle reshapes the selected tree, depth regrows it in place, and wind ranges from still to visible sway. Resize the window, pick a tree again, and check the console for errors. Add the verified URL to section 1.5 through a reviewed pull request.
 
 On a free GitHub account, Pages needs a public repository.
