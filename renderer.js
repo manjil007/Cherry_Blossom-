@@ -260,15 +260,17 @@ function drawTree(tree) {
 }
 
 
-/** Matches the canvas's drawing buffer to its size on screen, and updates the viewport. */
+/** Updates the viewport and returns the CSS bounds used for camera projection and picking. */
 function resizeCanvas() {
   const { canvas, gl } = renderer;
+  const bounds = canvas.getBoundingClientRect();
   const ratio = window.devicePixelRatio || 1;
-  const width = Math.max(1, Math.round(canvas.clientWidth * ratio));
-  const height = Math.max(1, Math.round(canvas.clientHeight * ratio));
+  const width = Math.max(1, Math.round(bounds.width * ratio));
+  const height = Math.max(1, Math.round(bounds.height * ratio));
   if (canvas.width !== width) canvas.width = width;
   if (canvas.height !== height) canvas.height = height;
   gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+  return bounds;
 }
 
 
@@ -283,9 +285,10 @@ function resizeCanvas() {
 function drawScene(garden, camera) {
   const { gl, uniforms, meshes } = renderer;
   if (!gl) return;
-  resizeCanvas();
+  const { width, height } = resizeCanvas();
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-  const viewProjection = getViewProjection(gl.drawingBufferWidth / gl.drawingBufferHeight);
+  if (width === 0 || height === 0) return;
+  const viewProjection = getViewProjection(width / height);
   gl.uniformMatrix4fv(uniforms.uViewProjection, false, viewProjection);
   drawMesh(meshes.ground, renderer.groundModel, GROUND_COLOR);
   for (const tree of garden.trees) drawTree(tree);
