@@ -366,19 +366,19 @@ git commit -m "Build the recursive branch hierarchy"
 git push -u origin member1-hierarchy
 ```
 
-Then open a pull request on GitHub. Another member reviews it before it is merged into main. Before starting new work, bring your branch up to date:
+Then open a pull request on GitHub with `master` as the base. Another member reviews it before it is merged. Before starting new work, bring your branch up to date:
 
 ```
-git checkout main
+git checkout master
 git pull
 git checkout member1-hierarchy
-git merge main
+git merge master
 ```
 
 ## 9. Deployment (Member 4)
 
 1. On GitHub, open the repository's **Settings → Pages**.
-2. Under **Build and deployment**, choose **Deploy from a branch**, select the **main** branch and the **/ (root)** folder, and save.
+2. Under **Build and deployment**, choose **Deploy from a branch**, select the **master** branch and the **/ (root)** folder, and save.
 3. Wait for the Pages deployment to succeed. Open the URL shown in **Settings → Pages** in a fresh browser tab.
 4. Watch the opening tree grow and its blossoms brighten. Plant two more trees, click to switch the selection ring, and confirm a fourth planting shows the limit notice. Orbit across overlapping branches to check lighting and depth. Dragging should leave the tree count unchanged.
 5. Check each slider. Branch angle reshapes the selected tree, depth regrows it in place, and wind ranges from still to visible sway. Resize the window, pick a tree again, and check the console for errors. Add the verified URL to section 1.5 through a reviewed pull request.
