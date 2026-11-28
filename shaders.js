@@ -32,9 +32,41 @@
 // =============================================================================
 
 const VERTEX_SHADER = `#version 300 es
-// TODO (Member 4): the vertex shader described above
+layout(location = 0) in vec3 aPosition;
+layout(location = 1) in vec3 aNormal;
+
+uniform mat4 uModel;
+uniform mat4 uViewProjection;
+uniform mat3 uNormalMatrix;
+
+out vec3 vPosition;
+out vec3 vNormal;
+
+void main() {
+  vec4 worldPosition = uModel * vec4(aPosition, 1.0);
+  vPosition = worldPosition.xyz;
+  vNormal = normalize(uNormalMatrix * aNormal);
+  gl_Position = uViewProjection * worldPosition;
+}
 `;
 
 const FRAGMENT_SHADER = `#version 300 es
-// TODO (Member 4): the fragment shader described above
+precision highp float;
+
+in vec3 vPosition;
+in vec3 vNormal;
+
+uniform vec3 uColor;
+uniform vec3 uEmissive;
+uniform vec3 uAmbient;
+uniform vec3 uLightDirection;
+uniform vec3 uLightColor;
+
+out vec4 fragColor;
+
+void main() {
+  float diffuse = max(dot(normalize(vNormal), uLightDirection), 0.0);
+  vec3 litColor = uColor * (uAmbient + uLightColor * diffuse);
+  fragColor = vec4(litColor + uEmissive, 1.0);
+}
 `;
